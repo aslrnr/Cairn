@@ -63,6 +63,7 @@ button small{display:block;color:var(--dim);font-size:.85em;margin-top:.15em}
 .up.maxed .cost{color:var(--moss)}
 #go{font-family:var(--display);font-size:1.6em;text-align:center;width:100%;padding:.45em;background:#3a2318;border-color:var(--ember);letter-spacing:.06em}
 #go:hover,#go:focus-visible{background:#4d2d1d}
+.opts select{background:var(--stone2);color:var(--bone);border:1px solid var(--line);font:inherit;padding:.25em .4em;border-radius:2px}
 .opts{display:flex;gap:.6em;align-items:center;margin:.5em 0;color:var(--dim);flex-wrap:wrap}
 .ctl{margin-top:.9em;color:var(--dim);line-height:1.5;font-size:.92em}
 .ctl kbd{font-family:var(--pix);color:var(--bone);background:var(--stone2);border:1px solid var(--line);padding:0 .3em;border-radius:2px;font-size:.9em}
@@ -114,7 +115,7 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));
 const SAVE_KEY='cairn-save-v1';
 let save={gold:0,up:{},runs:0,best:0,seen:[],bossKills:0,ropeOn:false};
 try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(s)save=Object.assign(save,s)}catch(e){}
-if(!save.npc)save.npc={};if(!save.lore)save.lore=[];if(!save.flags)save.flags={};
+if(!save.shortcuts)save.shortcuts=[];if(!save.fusions)save.fusions=[];if(!save.look)save.look='ember';if(!save.npc)save.npc={};if(!save.lore)save.lore=[];if(!save.flags)save.flags={};
 function writeSave(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(save))}catch(e){}}
 const lvl=id=>save.up[id]||0;
 
@@ -164,6 +165,16 @@ const RELICS={
  restless:{n:'Restless Feet',tag:'Hex',d:'Move a third faster. You cannot drink flasks.'},
 };
 const SETS={Fire:'Burns last twice as long',Moon:'Dodge recovers twice as fast',Bone:'Up to 5 bones; each depth starts with one',Coin:'Chests and great foes spill double gold',Blood:'+2 max health',Storm:'Lightning strikes twice as hard',Hex:'+1 relic slot'};
+const FUSIONS={
+ thunderhead:{n:'Thunderhead',a:'storm',b:'ember',d:'Lightning sets foes burning.'},
+ echo:{n:'Echo Chamber',a:'moonshard',b:'rod',d:'Dodge echoes burst with lightning.'},
+ pyre:{n:'Pyre of Bones',a:'tooth',b:'kindling',d:'When a bone breaks, it bursts into flame around you.'},
+ bloodmoney:{n:'Blood Money',a:'greedy',b:'leech',d:'Every 25 gold you pick up restores 1 health.'},
+ nightblood:{n:'Nightblood',a:'halo',b:'vein',d:'A perfect dodge refills a flask.'},
+ ashen:{n:'Ashen Wings',a:'moth',b:'cinder',d:'Gliding leaves a trail of fire.'},
+ cometfall:{n:'Cometfall',a:'comet',b:'coal',d:'Downward strikes set foes burning.'},
+};
+const SETS3={Fire:'Burning ticks twice as hard',Moon:'A perfect dodge also grants a moment of safety',Bone:'+3 bone capacity',Coin:'Coins are worth half again as much',Blood:'+2 more max health',Storm:'Every second swing hurls lightning',Hex:'+25% damage'};
 const DEPTHS=['The Outer Ruin','The Sunken Nave','The Warden\u2019s Stair','The Ossuary','The Drowned Choir','The Ember Vaults','The Pale Deep','The Roots of the Hill','The Bleeding Garden','The Last Cairn'];
 const PALS=[
  {style:'brick',bgk:'colossus',fog:'#0e1413',sky:'#1b2a25',far:'#16211d',mid:'#1c2622',back:'#1f2823',stone:'#474f45',hi:'#6b7862',dk:'#2a312a',moss:'#64913f',lamp:'255,190,120',tint:'6,11,9',glow:'#a6ec7e',banner:'#4a2a22',props:['bones','urn','statue','grave','sword','mush','grass','grass'],ceil:['roots','roots','chain','vine'],wall:['torch','banner','torch']},
@@ -210,7 +221,7 @@ const SFX={
 function sfx(n){try{SFX[n]&&SFX[n]()}catch(e){}}
 
 // ================== input ==================
-const KEYMAP={left:['ArrowLeft','KeyA'],right:['ArrowRight','KeyD'],down:['ArrowDown','KeyS'],jump:['Space','KeyZ','KeyW','ArrowUp'],attack:['KeyQ','KeyX','KeyJ'],dodge:['KeyF','KeyC','KeyK','ShiftLeft','ShiftRight','KeyL'],interact:['KeyE','ArrowDown','KeyS'],heal:['KeyR','KeyH']};
+const KEYMAP={left:['ArrowLeft','KeyA'],right:['ArrowRight','KeyD'],down:['ArrowDown','KeyS'],jump:['Space','KeyZ','KeyW','ArrowUp'],attack:['KeyF','KeyX','KeyJ'],dodge:['KeyQ','KeyC','KeyK','ShiftLeft','ShiftRight','KeyL'],interact:['KeyE','ArrowDown','KeyS'],heal:['KeyR','KeyH']};
 const held={}, pressed={};
 const codeToActs={};for(const a in KEYMAP)for(const c of KEYMAP[a])(codeToActs[c]=codeToActs[c]||[]).push(a);
 addEventListener('keydown',e=>{
@@ -635,8 +646,16 @@ function newPlayer(){
 const has=id=>P&&P.relics.includes(id);
 function tagCount(tag){return P.relics.filter(id=>RELICS[id].tag===tag).length}
 const setOn=tag=>tagCount(tag)>=2;
+const set3=tag=>tagCount(tag)>=3;
+const fused=id=>{const f=FUSIONS[id];return !!P&&has(f.a)&&has(f.b)};
+function bonusIds(list=P.relics){const out=[];for(const id in FUSIONS){const f=FUSIONS[id];if(list.includes(f.a)&&list.includes(f.b))out.push('F:'+id)}for(const t in TAGS)if(list.filter(r=>RELICS[r].tag===t).length>=3)out.push('T:'+t);return out}
+function announceBonus(b){let msg;
+  if(b[0]==='F'){const id=b.slice(2),fu=FUSIONS[id];if(!save.fusions.includes(id)){save.fusions.push(id);writeSave()}msg=fu.n+' awakens: '+fu.d}
+  else{const t=b.slice(2);msg=t+' set, third piece: '+SETS3[t]}
+  setTimeout(()=>{if(state==='run'&&P){sfx('cairn');burst(P.x+5,P.y+7,'#ffd27a',22);toast(msg,4600)}},1500)}
 function recalc(){
-  const base=5+lvl('vigor')+(has('vein')?1:0)+(setOn('Blood')?2:0)+(P.boons.hale?2:0)-P.hpTax;
+  const nowB=bonusIds();if(P.bonusSeen)for(const b of nowB)if(!P.bonusSeen.includes(b))announceBonus(b);P.bonusSeen=nowB;
+  const base=5+lvl('vigor')+(has('vein')?1:0)+(setOn('Blood')?2:0)+(set3('Blood')?2:0)+(P.boons.hale?2:0)-P.hpTax;
   const old=P.maxhp;P.maxhp=Math.max(1,base);
   if(P.maxhp>old)P.hp+=P.maxhp-old;
   if(has('glass'))P.maxhp=Math.min(P.maxhp,2);
@@ -644,8 +663,8 @@ function recalc(){
   P.slots=3+lvl('satchel')+(setOn('Hex')?1:0);
   updateHud(true);
 }
-const maxBones=()=>(setOn('Bone')?5:3);
-function weaponDmg(){let d=1+.25*lvl('blade');if(has('thorn')&&P.hp<=P.maxhp/2)d*=2;if(has('ossuary'))d*=1+.3*P.bones;if(has('tithe'))d+=Math.min(3,Math.floor(P.gold/100));if(has('glass'))d*=3;if(has('hollow'))d*=1.6;d*=1+.25*(P.temper||0);if(P.boons.keen)d*=1.25;return d}
+const maxBones=()=>(setOn('Bone')?5:3)+(set3('Bone')?3:0);
+function weaponDmg(){let d=1+.25*lvl('blade');if(has('thorn')&&P.hp<=P.maxhp/2)d*=2;if(has('ossuary'))d*=1+.3*P.bones;if(has('tithe'))d+=Math.min(3,Math.floor(P.gold/100));if(has('glass'))d*=3;if(set3('Hex'))d*=1.25;if(has('hollow'))d*=1.6;d*=1+.25*(P.temper||0);if(P.boons.keen)d*=1.25;return d}
 
 // ================== tiles & physics ==================
 function tileAt(tx,ty){if(tx<0||tx>=L.w||ty<0)return 1;if(ty>=L.h)return 1;return L.t[ty*L.w+tx]}
@@ -672,7 +691,7 @@ let runStats={kills:0,relicsFound:0,deepest:1};
 function startRun(){
   P=newPlayer();
   P.maxFlasks=1+lvl('flask');P.flasks=P.maxFlasks;
-  depth=(lvl('rope')&&save.ropeOn)?4:1;
+  depth=(lvl('rope')&&save.ropeOn)?4:1;if(save.shortcuts.includes(save.startDepth))depth=Math.max(depth,save.startDepth);
   runStats={kills:0,relicsFound:0,deepest:depth};
   recalc();P.hp=P.maxhp;
   state='run';$('camp').hidden=true;$('hudR').hidden=false;$('relics').hidden=false;$('pauseBtn').style.display=isTouch?'block':'none';$('touch').style.display=isTouch?'flex':'none';
@@ -710,7 +729,7 @@ function finishDeath(){
   openModal('You fell',`Depth ${d}. ${runStats.kills} foes felled. You crawled home with <b style="color:var(--ember2)">${kept} gold</b>${lost?`; ${lost} stayed in the dark`:''}. The ruin will be different next time.${summaryHtml()}`,[{label:'Back to the fire'}],()=>{});
 }
 function toCamp(){
-  state='camp';dying=0;paused=false;L=null;fadeA=0;fadeDir=0;musicSet(65.4,[0,2,4,7,9,12]);
+  state='camp';dying=0;paused=false;L=null;{const bn=$('banner');if(bn)bn.style.opacity=0}fadeA=0;fadeDir=0;musicSet(65.4,[0,2,4,7,9,12]);
   $('hudR').hidden=true;$('relics').hidden=true;$('prompt').hidden=true;$('pauseBtn').style.display='none';$('touch').style.display='none';
   $('camp').hidden=false;renderCamp();
 }
@@ -728,7 +747,7 @@ function togglePause(){
   ],()=>{});
 }
 function showControls(){openModal('Controls',CONTROLS_HTML,[{label:'Back'}],()=>{})}
-const CONTROLS_HTML=`<kbd>A D</kbd> or arrows move &middot; <kbd>Space</kbd> or <kbd>W</kbd> jump, hold to glide &middot; <kbd>Q</kbd> or click strike (hold down in the air to strike downward) &middot; <kbd>F</kbd> or <kbd>Shift</kbd> roll &middot; <kbd>E</kbd> use &middot; <kbd>R</kbd> drink flask &middot; hold <kbd>S</kbd> to look down, <kbd>S</kbd> + jump drops through ledges &middot; <kbd>Esc</kbd> pause &middot; <kbd>M</kbd> sound`;
+const CONTROLS_HTML=`<kbd>A D</kbd> or arrows move &middot; <kbd>Space</kbd> or <kbd>W</kbd> jump, hold to glide &middot; <kbd>F</kbd> or click strike (hold down in the air to strike downward) &middot; <kbd>Q</kbd> or <kbd>Shift</kbd> roll &middot; <kbd>E</kbd> use &middot; <kbd>R</kbd> drink flask &middot; hold <kbd>S</kbd> to look down, <kbd>S</kbd> + jump drops through ledges &middot; <kbd>Esc</kbd> pause &middot; <kbd>M</kbd> sound`;
 
 // ================== relic handling ==================
 function addRelic(id,silent){
@@ -806,6 +825,7 @@ function spillGold(x,y,amt){
 function hurtPlayer(srcX,dmg=1){
   if(P.inv>0||P.dodgeT>0||dying)return;
   if(P.bones>0){P.bones--;P.inv=.7;sfx('clang');burst(P.x+5,P.y+7,'#e6dcc0',12);
+    if(fused('pyre')){L.fires.push({x:P.x+5,y:P.y+8,r:2,t:.35,boom:true});for(const o of L.enemies)if(!o.dead&&Math.hypot(o.x+o.w/2-P.x-5,o.y+o.h/2-P.y-7)<60){o.burn=Math.max(o.burn,3);hurtEnemy(o,2,'fire')}}
     if(has('marrow'))for(let i=0;i<8;i++){const a=i/8*Math.PI*2;L.projs.push({x:P.x+5,y:P.y+7,vx:Math.cos(a)*200,vy:Math.sin(a)*200,r:2,life:.5,friendly:true,dmg:1.5,kind:'shard'})}
     if(has('static'))staticBurst();return}
   P.hurtF=.4;P.fish=null;P.hp-=dmg;P.inv=1.1;sfx('hurt');shake=5;freeze=.09;P.empower=0;
@@ -819,6 +839,7 @@ function staticBurst(){sfx('zap');for(const e of L.enemies)if(!e.dead&&Math.hypo
 let zaps=[],freeze=0,impacts=[],afterimgs=[];
 function zapLine(x1,y1,x2,y2){const pts=[[x1,y1]];const n=6;for(let i=1;i<n;i++){pts.push([x1+(x2-x1)*i/n+rnd(-6,6),y1+(y2-y1)*i/n+rnd(-6,6)])}pts.push([x2,y2]);zaps.push({pts,t:.18})}
 function lightningHit(e,d){
+  if(fused('thunderhead'))e.burn=Math.max(e.burn,3);
   let dd=d*(setOn('Storm')?2:1);if(has('rod')&&e.burn>0)dd*=2;
   hurtEnemy(e,dd,'zap');
   if(has('rod')){let best=null,bd=90;for(const o of L.enemies){if(o.dead||o===e)continue;const dist=Math.hypot(o.x-e.x,o.y-e.y);if(dist<bd){bd=dist;best=o}}
@@ -897,7 +918,7 @@ function updatePlayer(dt){
   // gravity & glide
   const glideMax=has('moth')?28:62;
   p.gliding=held.jump&&p.vy>0&&!p.onGround&&p.dodgeT<=0;
-  if(p.gliding&&!p.wasGlide){noise(.3,.03,1400);burst(p.x+5,p.y+6,'#9fb4ff',8)}p.wasGlide=p.gliding;
+  if(p.gliding&&!p.wasGlide){noise(.3,.03,1400);burst(p.x+5,p.y+6,'#9fb4ff',8)}p.wasGlide=p.gliding;if(p.gliding&&fused('ashen')&&R()<.5)L.fires.push({x:p.x+5,y:p.y+12,r:6,t:1.2,trail:true,tick:0});
   p.vy+=900*dt;
   if(p.gliding)p.vy=Math.min(p.vy,glideMax);
   p.vy=Math.min(p.vy,360);
@@ -909,7 +930,7 @@ function updatePlayer(dt){
     p.heavy=p.combo===3&&!p.atkDown;p.quaked=false;
     p.atkMax=p.atkT=(p.heavy?.34:.24)*w.spd;p.atkCD=(p.heavy?.44:.26)*w.spd;p.swingId++;p.swings++;sfx(p.heavy||w.maul?'swingH':'swing');
     if(p.onGround&&!p.atkDown)p.vx=p.face*(p.heavy?150:85);
-    if(has('storm')&&p.swings%4===0){L.projs.push({x:p.x+5+p.face*8,y:p.y+6,vx:p.face*280,vy:0,r:3,life:.9,friendly:true,dmg:2,kind:'bolt'});sfx('zap')}
+    if(has('storm')&&p.swings%(set3('Storm')?2:4)===0){L.projs.push({x:p.x+5+p.face*8,y:p.y+6,vx:p.face*280,vy:0,r:3,life:.9,friendly:true,dmg:2,kind:'bolt'});sfx('zap')}
   }
   if(p.atkT>0){
     p.atkT-=dt;
@@ -921,7 +942,7 @@ function updatePlayer(dt){
       const hb=p.atkDown?{x:p.x-4,y:p.y+p.h-2,w:p.w+8,h:18}:{x:p.face>0?p.x+p.w-2:p.x+2-reach,y:p.y-(p.heavy?7:3),w:reach,h:p.h+(p.heavy?10:5)};
       let hitAny=false;
       for(const e of L.enemies){if(e.dead||e.swingId===p.swingId)continue;if(overlap(hb,e)){e.swingId=p.swingId;p.hits++;let d=weaponDmg()*w.dmg*(p.heavy?1.8:1);p.critNow=false;
-        if(p.atkDown&&(has('comet')||w.pole))d*=has('comet')&&w.pole?3:has('comet')?2:1.5;
+        if(p.atkDown&&(has('comet')||w.pole))d*=has('comet')&&w.pole?3:has('comet')?2:1.5;if(p.atkDown&&fused('cometfall'))e.burn=Math.max(e.burn,3);
         if(w.twin&&!e.fly&&!e.big&&sign(p.x+5-(e.x+e.w/2))!==e.face){d*=2;p.critNow=true}
         if(p.empower>0){d*=2.5;p.empower=0;p.critNow=true}
         if(has('knuckle')&&p.hits%5===0){d*=3;spillGold(e.x+e.w/2,e.y,3);shake=3}
@@ -982,7 +1003,7 @@ function interact(en){
   switch(en.type){
     case 'cairn':{
       openModal('A cairn',en.used?'The stones are cold now, but they still know the way home.':'Someone stacked these stones long ago. Resting here mends you and refills your flasks, once.',[
-        {label:'Rest',sub:'Heal fully and refill flasks.',disabled:en.used,fn:()=>{en.used=true;P.hp=P.maxhp;P.flasks=P.maxFlasks;sfx('cairn');burst(en.x+10,en.y+8,'#ffb866',24);toast('You rest. The dark feels farther away.')}},
+        {label:'Rest',sub:'Heal fully and refill flasks.',disabled:en.used,fn:()=>{en.used=true;P.hp=P.maxhp;P.flasks=P.maxFlasks;sfx('cairn');if(!save.shortcuts.includes(depth)){save.shortcuts.push(depth);save.shortcuts.sort((a,b)=>a-b);writeSave();setTimeout(()=>{if(state==='run')toast('The cairn remembers this depth. You can begin here from camp.',3800)},1300)}burst(en.x+10,en.y+8,'#ffb866',24);toast('You rest. The dark feels farther away.')}},
         {label:`Go home with ${P.gold} gold`,sub:'Ends the run. Gold is kept; relics stay behind.',fn:()=>bank()},
         {label:'Keep exploring'}],()=>{});break}
     case 'exit':sfx('door');fadeTo(()=>enterDepth(depth+1));break;
@@ -1034,7 +1055,7 @@ function ringBell(b){
 // ---------- enemies ----------
 function updateEnemy(e,dt){
   e.anim+=dt;e.flash=Math.max(0,e.flash-dt);e.hurtT=Math.max(0,(e.hurtT||0)-dt);e.t-=dt;
-  if(e.burn>0){e.burn-=dt;e.burnTick-=dt;if(R()<.4)part(e.x+rnd(0,e.w),e.y+rnd(0,e.h),rnd(-10,10),rnd(-50,-20),.4,pick(['#e8743b','#ffb866']),1);if(e.burnTick<=0){e.burnTick=.6;hurtEnemy(e,1,'fire');if(e.dead)return}}
+  if(e.burn>0){e.burn-=dt;e.burnTick-=dt;if(R()<.4)part(e.x+rnd(0,e.w),e.y+rnd(0,e.h),rnd(-10,10),rnd(-50,-20),.4,pick(['#e8743b','#ffb866']),1);if(e.burnTick<=0){e.burnTick=.6;hurtEnemy(e,set3('Fire')?2:1,'fire');if(e.dead)return}}
   const cx=e.x+e.w/2,pcx=P.x+P.w/2,dx=pcx-cx,dy=(P.y+P.h)-(e.y+e.h),adx=Math.abs(dx),dist=Math.hypot(dx,dy);
   e.atk=null;
   switch(e.type){
@@ -1255,7 +1276,7 @@ function updateCoins(dt){
       if((solid(v)||v===2)&&c.vy>0){c.vy*=-.35;c.vx*=.7;if(Math.abs(c.vy)<20){c.vy=0}}else c.y=ny;
       if(solid(tileAt(Math.floor(c.x/T),Math.floor(c.y/T))))c.y-=2;
     }
-    if(d<8){c.got=true;P.gold+=Math.ceil(c.v*(P.boons.lucky?1.5:1))+(has('lodestone')?1:0);sfx('coin');part(c.x,c.y,0,-30,.3,'#ffd27a',1)}
+    if(d<8){c.got=true;const gv=Math.ceil(c.v*(P.boons.lucky?1.5:1)*(set3('Coin')?1.5:1))+(has('lodestone')?1:0);P.gold+=gv;if(fused('bloodmoney')){P.goldAcc=(P.goldAcc||0)+gv;if(P.goldAcc>=25){P.goldAcc-=25;if(P.hp<P.maxhp){P.hp++;burst(P.x+5,P.y+7,'#d04148',8);pop(P.x+5,P.y-8,'+1','#d04148')}}}sfx('coin');part(c.x,c.y,0,-30,.3,'#ffd27a',1)}
   }
   L.coins=L.coins.filter(c=>!c.got);
 }
@@ -1289,7 +1310,7 @@ function updateFires(dt){
   for(const f of L.fires){
     f.t-=dt;
     if(f.trail){f.tick-=dt;if(R()<.3)part(f.x+rnd(-4,4),f.y,rnd(-5,5),rnd(-40,-20),.4,pick(['#e8743b','#ffb866']),1);if(f.tick<=0){f.tick=.4;for(const e of L.enemies)if(!e.dead&&Math.abs(e.x+e.w/2-f.x)<10&&Math.abs(e.y+e.h-f.y)<14){e.burn=Math.max(e.burn,2);hurtEnemy(e,.5,'fire')}}}
-    if(f.echo&&f.t<=0&&!f.done){f.done=true;burst(f.x,f.y,'#9fb4ff',20);for(const e of L.enemies)if(!e.dead&&Math.hypot(e.x+e.w/2-f.x,e.y+e.h/2-f.y)<36)hurtEnemy(e,2,'echo')}
+    if(f.echo&&f.t<=0&&!f.done){f.done=true;burst(f.x,f.y,'#9fb4ff',20);for(const e of L.enemies)if(!e.dead&&Math.hypot(e.x+e.w/2-f.x,e.y+e.h/2-f.y)<36){hurtEnemy(e,2,'echo');if(fused('echo')&&!e.dead){zapLine(f.x,f.y,e.x+e.w/2,e.y+e.h/2);lightningHit(e,2)}}}
     if(f.boom){f.r+=dt*160}
   }
   L.fires=L.fires.filter(f=>f.t>0||(f.echo&&!f.done));
@@ -1612,6 +1633,17 @@ function buildPlayerSprites(){
   }
 }
 buildPlayerSprites();
+const LOOKS=[
+ {id:'ember',n:'Ember',cape:['#2e2838','#4a4159'],scarf:['#a8402f','#d0644a'],ok:()=>true,hint:''},
+ {id:'moss',n:'Moss',cape:['#27352a','#3f5a44'],scarf:['#b8a24a','#e0cc6a'],ok:()=>save.best>=3,hint:'Reach depth 3'},
+ {id:'moon',n:'Moon',cape:['#2a3150','#46528a'],scarf:['#cfd8f0','#ffffff'],ok:()=>save.bossKills>=1,hint:'Fell a great foe'},
+ {id:'ash',n:'Ash',cape:['#3a3a3e','#5e5e66'],scarf:['#d8d0b8','#f2ead0'],ok:()=>save.runs>=10,hint:'Stack ten stones'},
+ {id:'bone',n:'Bone',cape:['#6e6a5a','#9a9482'],scarf:['#1c1a20','#4a4650'],ok:()=>save.lore.length>=10,hint:'Read ten inscriptions'},
+ {id:'violet',n:'Violet',cape:['#3a2a52','#5e4586'],scarf:['#c8a050','#ffd27a'],ok:()=>!!(save.flags.firstDead||save.flags.bellDead),hint:'Fell the Bell-Mother or the First Pilgrim'},
+ {id:'gilt',n:'Gilt',cape:['#5a4318','#8a6a2a'],scarf:['#f0e6c8','#ffffff'],ok:()=>save.best>=7,hint:'Reach depth 7'},
+];
+function applyLook(){const l=LOOKS.find(x=>x.id===save.look&&x.ok())||LOOKS[0];PPAL.c=l.cape[0];PPAL.C=l.cape[1];PPAL.r=l.scarf[0];PPAL.R=l.scarf[1];buildPlayerSprites()}
+applyLook();
 function clothInit(n,x,y){const a=[];for(let i=0;i<n;i++)a.push({x,y:y+i*2,px:x,py:y+i*2});return a}
 function updateCloth(pts,ax,ay,seg,grav){
   pts[0].x=ax;pts[0].y=ay;pts[0].px=ax;pts[0].py=ay;
@@ -2029,6 +2061,15 @@ function drawCamp(){
   for(const p of campParts){p.x+=p.vx/60;p.y+=p.vy/60;const t=p.life/p.max;ctx.fillStyle=t>.6?'#ffe2a0':t>.3?'#ffb866':'#c8543a';ctx.fillRect(p.x|0,p.y|0,2,2)}
   // glow
   ctx.save();ctx.globalCompositeOperation='lighter';const r=90+Math.sin(gtime*8)*3;const g=ctx.createRadialGradient(fx,fy-6,0,fx,fy-6,r);g.addColorStop(0,'rgba(255,150,70,.35)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(fx-r,fy-6-r,r*2,r*2);ctx.restore();
+  // the camp grows with every stone and every great foe felled
+  {const K='#0b0a10',rn=save.runs;
+   if(rn>=4){ctx.fillStyle=K;ctx.beginPath();ctx.moveTo(2,fy+1);ctx.lineTo(25,fy-27);ctx.lineTo(48,fy+1);ctx.fill();ctx.fillStyle='#3a3038';ctx.beginPath();ctx.moveTo(5,fy);ctx.lineTo(25,fy-24);ctx.lineTo(45,fy);ctx.fill();ctx.fillStyle='#4a3e48';ctx.beginPath();ctx.moveTo(25,fy-24);ctx.lineTo(45,fy);ctx.lineTo(32,fy);ctx.fill();ctx.fillStyle='#120f16';ctx.beginPath();ctx.moveTo(20,fy);ctx.lineTo(25,fy-12);ctx.lineTo(30,fy);ctx.fill();ctx.fillStyle=PPAL.r;ctx.fillRect(24,fy-27,2,2)}
+   if(rn>=8){const x0=25,y0=fy-27,x1=206,y1=fy-34;ctx.strokeStyle='#2a2430';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x0,y0);ctx.quadraticCurveTo((x0+x1)/2,y0+34,x1,y1);ctx.stroke();
+    for(let i=1;i<6;i++){const t=i/6,bx=(1-t)*(1-t)*x0+2*(1-t)*t*((x0+x1)/2)+t*t*x1,by=(1-t)*(1-t)*y0+2*(1-t)*t*(y0+34)+t*t*y1;const fl=.6+.4*Math.sin(gtime*3+i*2);
+     ctx.fillStyle=K;ctx.fillRect(Math.round(bx)-2,Math.round(by),5,6);ctx.fillStyle=`rgba(255,${190+i*8},120,${.7+.3*fl})`;ctx.fillRect(Math.round(bx)-1,Math.round(by)+1,3,4);
+     ctx.save();ctx.globalCompositeOperation='lighter';const g2=ctx.createRadialGradient(bx,by+3,0,bx,by+3,22);g2.addColorStop(0,`rgba(255,170,90,${.18*fl})`);g2.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g2;ctx.fillRect(bx-22,by-19,44,44);ctx.restore()}}
+   if(rn>=14){ctx.fillStyle=K;ctx.fillRect(204,fy-40,4,42);ctx.fillStyle='#6b6252';ctx.fillRect(205,fy-39,2,40);const wv=Math.sin(gtime*2)*1.5;ctx.fillStyle=K;ctx.fillRect(207,fy-39,14,16);ctx.fillStyle=PPAL.r;ctx.fillRect(207,fy-38,12+Math.round(wv),13);ctx.fillStyle=PPAL.R;ctx.fillRect(207,fy-38,12+Math.round(wv),2);ctx.fillStyle='#e6dcc0';ctx.fillRect(212,fy-34,3,4)}
+   if(save.bossKills>=1){for(let i=0;i<Math.min(4,save.bossKills);i++){const yy=fy-6*(i+1);ctx.fillStyle=K;ctx.fillRect(223,yy-1,10,7);ctx.fillStyle='#d9d4c6';ctx.fillRect(224,yy,8,5);ctx.fillStyle=K;ctx.fillRect(225,yy+1,2,2);ctx.fillRect(229,yy+1,2,2)}}}
   // those who share the fire
   if(save.runs>=1){const ox=fx-34,oy=fy-17;ctx.fillStyle='#0b0a10';ctx.fillRect(ox-1,oy+1,13,17);ctx.fillStyle='#4a4338';ctx.fillRect(ox,oy+7,11,10);ctx.fillStyle='#5c5446';ctx.fillRect(ox+2,oy+2,7,6);ctx.fillStyle='#0d0c10';ctx.fillRect(ox+6,oy+4,3,2);ctx.fillStyle='#b8b09a';ctx.fillRect(ox+5,oy+7,4,4);ctx.fillStyle='#6b6252';ctx.fillRect(ox-3,oy-4,1,21)}
   if((save.npc.veil||0)>=2){const ox=fx+44,oy=fy-18;ctx.fillStyle='#0b0a10';ctx.fillRect(ox-1,oy,12,18);ctx.fillStyle='#2a2e44';ctx.fillRect(ox,oy+6,10,12);ctx.fillStyle='#cfc8d8';ctx.fillRect(ox+2,oy+1,6,6);ctx.fillStyle='#9a94a8';ctx.fillRect(ox+2,oy+3,6,3)}
@@ -2051,21 +2092,25 @@ function renderCamp(){
    <div class="sub">A fire at the foot of the hill. The ruin is below.</div>
    <div class="stats"><span><b>${save.gold}</b> gold</span><span><b>${save.runs}</b> stones</span><span>deepest <b>${save.best}</b></span><span>relics seen <b>${save.seen.length}</b>/${Object.keys(RELICS).length}</span></div>
    ${lvl('rope')?`<label class="opts"><input type="checkbox" id="ropeT" ${save.ropeOn?'checked':''}> Use the long rope and start at depth 4</label>`:''}
+   ${save.shortcuts.length?`<label class="opts">Begin at <select id="startD"><option value="1">Depth 1 &middot; ${DEPTHS[0]}</option>${save.shortcuts.filter(d=>d>1).map(d=>`<option value="${d}" ${save.startDepth===d?'selected':''}>Depth ${d} &middot; ${DEPTHS[(d-1)%DEPTHS.length]}</option>`).join('')}</select></label>`:''}
    <button id="go">Descend</button>
    ${campFolk().length?`<div class="sub" style="margin:.7em 0 .4em">By the fire</div><div style="display:flex;gap:.5em;flex-wrap:wrap">${campFolk().map(id=>`<button data-folk="${id}">Speak with ${id==='orrin'?'Orrin':NPCS[id].name}</button>`).join('')}</div>`:''}
    <div class="ups" style="margin-top:.9em">${ups}</div>
    <div class="sub" style="margin:.2em 0 .5em">Armory</div>
    <div class="ups">${Object.keys(WEAPONS).map(id=>{const w=WEAPONS[id],own=save.weapons.includes(id),eq=save.weapon===id;return `<button class="up${eq?' maxed':''}" data-wp="${id}" style="${own||save.gold>=w.cost?'':'opacity:.55'}"><span class="nm"><span>${w.n}</span></span><span class="ds">${w.d}</span><span class="cost">${eq?'In hand':own?'Take up':w.cost+' gold'}</span></button>`}).join('')}</div>
    <div style="display:flex;gap:.5em;margin-bottom:.6em;flex-wrap:wrap"><button id="codex">Relic codex</button><button id="journal">Inscriptions ${save.lore.length}/${INSCRIPTIONS.length}</button><button id="fs">Fullscreen</button></div>
+   <div class="sub" style="margin:.2em 0 .4em">Wardrobe</div><div style="display:flex;gap:.4em;flex-wrap:wrap;margin-bottom:.7em">${LOOKS.map(l=>{const ok=l.ok(),on=save.look===l.id;return `<button data-look="${l.id}" style="${ok?'':'opacity:.5;'}${on?'border-color:var(--ember)':''}"><span style="display:inline-block;width:.7em;height:.7em;background:${l.cape[1]};margin-right:.25em"></span><span style="display:inline-block;width:.7em;height:.7em;background:${l.scarf[0]};margin-right:.4em"></span>${ok?l.n:l.hint}</button>`}).join('')}</div>
    <div class="ctl">${CONTROLS_HTML}</div>
    <div class="hint">No timers. Rest at cairns, go home whenever you like. When you fall, you keep half your gold. The ruin now runs deep: chasms and shafts drop storey after storey, with halls above and crypts below hiding troves, a peddler and stranger things. Speak with whoever you meet at the cairns, and read the old stones. Roll through a blow at the last moment for a perfect dodge: your next strike lands far harder. Every third depth, a great foe. Gamepads work too.</div>`;
   p.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>buyUp(b.dataset.up));
   p.querySelectorAll('[data-wp]').forEach(b=>b.onclick=()=>{const id=b.dataset.wp,w=WEAPONS[id];audioInit();if(!save.weapons.includes(id)){if(save.gold<w.cost){toast('Not enough gold yet.');return}save.gold-=w.cost;save.weapons.push(id);sfx('relic')}save.weapon=id;writeSave();renderCamp()});
   $('fs').onclick=goFullscreen;
+  p.querySelectorAll('[data-look]').forEach(b=>b.onclick=()=>{const l=LOOKS.find(x=>x.id===b.dataset.look);if(!l.ok()){toast(l.hint+' to unlock this.');return}save.look=l.id;writeSave();applyLook();renderCamp()});
   $('journal').onclick=()=>openModal('Inscriptions',journalHtml(),[{label:'Close'}],()=>{});
   p.querySelectorAll('[data-folk]').forEach(b=>b.onclick=()=>{audioInit();campTalk(b.dataset.folk)});
   $('codex').onclick=()=>openModal('Relic codex',codexHtml(),[{label:'Close'}],()=>{});
   $('go').onclick=()=>{audioInit();startRun()};
+  const sd=$('startD');if(sd)sd.onchange=()=>{save.startDepth=+sd.value;writeSave()};
   const rt=$('ropeT');if(rt)rt.onchange=()=>{save.ropeOn=rt.checked;writeSave()};
   if(!modalOpen)$('go').focus({preventScroll:true});
 }
@@ -2116,7 +2161,7 @@ function triggerPit(en){
   const kinds=['husk','husk','husk',depth>=3?'knight':'husk',depth>=5?'knight':'husk'];
   kinds.forEach((k,i)=>{const e=mkEnemy(k,en.x+22+(i-2)*46,en.y-24,depth);e.bellId=en.id;e.t=.7+i*.25;L.enemies.push(e);burst(e.x+5,e.y+10,'#d6ccb0',10)});
 }
-function relicsHtml(){return P.relics.length?P.relics.map(id=>`<div style="margin:.35em 0">${relicLabel(id)}<br><span style="font-size:.9em">${RELICS[id].d}</span></div>`).join('')+Object.keys(TAGS).filter(t=>setOn(t)).map(t=>`<div style="margin:.35em 0;color:var(--ember2)">${t} set: ${SETS[t]}</div>`).join(''):'Your satchel is empty.'}
+function relicsHtml(){return P.relics.length?P.relics.map(id=>`<div style="margin:.35em 0">${relicLabel(id)}<br><span style="font-size:.9em">${RELICS[id].d}</span></div>`).join('')+Object.keys(TAGS).filter(t=>setOn(t)).map(t=>`<div style="margin:.35em 0;color:var(--ember2)">${t} set: ${SETS[t]}</div>`).join('')+Object.keys(TAGS).filter(t=>set3(t)).map(t=>`<div style="margin:.35em 0;color:var(--ember2)">${t}, three pieces: ${SETS3[t]}</div>`).join('')+Object.keys(FUSIONS).filter(fused).map(id=>`<div style="margin:.35em 0;color:#ffd27a">Fusion, ${FUSIONS[id].n}: ${FUSIONS[id].d}</div>`).join(''):'Your satchel is empty.'}
 function fmtTime(t){const m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+String(s).padStart(2,'0')}
 function summaryHtml(){return `<br><span style="font-family:var(--pix);font-size:.9em">depth ${runStats.deepest} &middot; ${runStats.kills} foes &middot; ${runStats.relicsFound} relics &middot; ${fmtTime(runStats.t||0)}</span>`}
 function goFullscreen(){try{const el=document.documentElement;if(document.fullscreenElement)document.exitFullscreen();else el.requestFullscreen().catch(()=>toast('Fullscreen is not available here. Open the game in its own tab.'))}catch(e){toast('Fullscreen is not available here.')}}
@@ -2175,6 +2220,8 @@ function perfectDodge(){
   pop(P.x+5,P.y-8,'perfect','#9fb4ff',true);tone(880,.3,'sine',.06,1760);tone(1320,.4,'sine',.04,null,.05);
   burst(P.x+5,P.y+7,'#9fb4ff',14);
   if(has('halo')&&P.hp<P.maxhp){P.hp++;burst(P.x+5,P.y+7,'#ffb866',10)}
+  if(set3('Moon'))P.inv=Math.max(P.inv,1.2);
+  if(fused('nightblood')&&P.flasks<P.maxFlasks){P.flasks++;pop(P.x+5,P.y-16,'+flask','#ffb866')}
 }
 // ================== music ==================
 let masterOut=null;
@@ -2244,7 +2291,7 @@ function drawBossBar(){
   ctx.fillStyle='#c8434a';ctx.fillRect(x,y,Math.max(0,w*b.hp/b.maxhp),4);ctx.fillStyle='#f08a8a';ctx.fillRect(x,y,Math.max(0,w*b.hp/b.maxhp),1);
 }
 function warePrice(en){return Math.max(5,Math.round(en.price*(has('tongue')?.67:1)))}
-function codexHtml(){return Object.keys(RELICS).map(id=>save.seen.includes(id)?`<div style="margin:.35em 0">${relicLabel(id)}<br><span style="font-size:.9em">${RELICS[id].d}</span><br><span style="font-size:.85em;font-style:italic;color:var(--dim)">${RLORE[id]||''}</span></div>`:`<div style="margin:.35em 0;opacity:.4">? ? ?</div>`).join('')}
+function codexHtml(){return Object.keys(RELICS).map(id=>save.seen.includes(id)?`<div style="margin:.35em 0">${relicLabel(id)}<br><span style="font-size:.9em">${RELICS[id].d}</span><br><span style="font-size:.85em;font-style:italic;color:var(--dim)">${RLORE[id]||''}</span></div>`:`<div style="margin:.35em 0;opacity:.4">? ? ?</div>`).join('')+`<div style="margin:1em 0 .3em;color:var(--ember2)">Fusions &middot; hold both relics to awaken one</div>`+Object.keys(FUSIONS).map(id=>{const fu=FUSIONS[id];return save.fusions.includes(id)?`<div style="margin:.35em 0"><span style="color:#ffd27a">${fu.n}</span> &middot; ${RELICS[fu.a].n} + ${RELICS[fu.b].n}<br><span style="font-size:.9em">${fu.d}</span></div>`:`<div style="margin:.35em 0;opacity:.4">? ? ?</div>`}).join('')+`<div style="margin:1em 0 .3em;color:var(--ember2)">Three of one tag</div>`+Object.keys(SETS3).map(t=>`<div style="margin:.25em 0;font-size:.9em"><span style="color:${TAGS[t]}">${t}</span>: ${SETS3[t]}</div>`).join('')}
 
 // ================== main loop ==================
 let last=performance.now(),acc=0;
@@ -2262,6 +2309,6 @@ function frame(now){
 toCamp();
 if(save.runs===0&&save.gold===0){openModal('Cairn','A ruin under a hill, different every time you go down. Find treasure, fell strange things, stack a stone when you come home. There is no clock here. Go slowly or go fast.',[{label:'Sit by the fire'}],()=>{})}
 requestAnimationFrame(frame);
-window.__cairn={mk:mkEnemy,addRelic:id=>addRelic(id,true),enterDepth:d=>enterDepth(d),get P(){return P},get L(){return L},get state(){return state},startRun,save};
+window.__cairn={recalc,mk:mkEnemy,addRelic:id=>addRelic(id,true),enterDepth:d=>enterDepth(d),get P(){return P},get L(){return L},get state(){return state},startRun,save};
 </script>
 </body></html>
