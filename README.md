@@ -14,8 +14,8 @@ Once GitHub Pages is switched on for this repository (Settings, Pages, Source: G
 
 - Move: `A` `D` or arrow keys
 - Jump: `Space` or `W` (hold to glide)
-- Strike: `Q` or mouse click (hold down in the air to strike downward)
-- Roll: `F` or `Shift`
+- Strike: `F` or mouse click (hold down in the air to strike downward)
+- Roll: `Q` or `Shift`
 - Use: `E`
 - Drink flask: `R`
 - Look down: hold `S`. Drop through ledges: `S` + jump
